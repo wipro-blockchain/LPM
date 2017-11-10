@@ -31,10 +31,13 @@ import (
 type ManageLPM struct {
 }
 
-var CustomerIndexStr = "_Customerindex"				// name for the key/value that will store a list of all known Customer
-var TransactionIndexStr = "_Transactionindex"		// name for the key/value that will store a list of all known Transaction
+var CustomerIndexStr = "_Customerindex"				//name for the key/value that will store a list of all known Customer
+var TransactionIndexStr = "_Transactionindex"		//name for the key/value that will store a list of all known Transaction
 var MerchantIndexStr = "_Merchantindex"				//name for the key/value that will store a list of all known Merchant
-var OwnerIndexStr = "_Ownerindex"				//name for the key/value that will store a list of all known Owner
+var OwnerIndexStr = "_Ownerindex"					//name for the key/value that will store a list of all known Owner
+
+var MerchantInitialBalance = "100000.00"
+var StartingBalance = "100.00"
 
 type Customer struct{							// Attributes of a Customer 
 	CustomerID string `json:"customerId"`					
@@ -71,6 +74,7 @@ type Merchant struct{							// Attributes of a Merchant
 	PurchaseBalance string `json:"purchaseBalance"`
 	MerchantCurrency string `json:"merchantCurrency"`
 	MerchantCU_date string `json:"merchantCU_date"`
+	MerchantInitialBalance string `json:"merchantInitialBalance"`
 }
 
 type Owner struct{							// Attributes of a Owner
@@ -145,31 +149,37 @@ func (t *ManageLPM) Invoke(stub shim.ChaincodeStubInterface, function string, ar
 	fmt.Println("invoke is running " + function)
 
 	// Handle different functions
-	if function == "init" {													//initialize the chaincode state, used as reset
+	if function == "init" {									//initialize the chaincode state, used as reset
 		return t.Init(stub, "init", args)
-	} else if function == "createCustomer" {											//create a new Customer
+	} else if function == "createCustomer" {				//create a new Customer
 		return t.createCustomer(stub, args)
-	}else if function == "updateCustomerAccumulation" {									//update a Customer
+	}else if function == "updateCustomerAccumulationSC" {		//update a Customer - Add points
+		return t.updateCustomerAccumulationSC(stub, args)
+	}else if function == "updateCustomerPurchaseSC" {			//update a Customer - Purchase
+		return t.updateCustomerPurchaseSC(stub, args)
+	}else if function == "updateCustomerTransferSC" {			//update a Customer - Transfer
+		return t.updateCustomerTransferSC(stub, args)
+	}else if function == "updateCustomerAccumulation" {		//update a Customer - Add points
 		return t.updateCustomerAccumulation(stub, args)
-	}else if function == "updateCustomerPurchase" {									//update a Customer
+	}else if function == "updateCustomerPurchase" {			//update a Customer - Purchase
 		return t.updateCustomerPurchase(stub, args)
-	}else if function == "updateCustomerTransfer" {									//update a Customer
+	}else if function == "updateCustomerTransfer" {			//update a Customer - Transfer
 		return t.updateCustomerTransfer(stub, args)
-	}else if function == "deleteCustomer" {									// delete a Customer
+	}else if function == "deleteCustomer" {					//delete a Customer
 		return t.deleteCustomer(stub, args)
-	}else if function == "createMerchant" {											//create a new Merchant
+	}else if function == "createMerchant" {					//create a new Merchant
 		return t.createMerchant(stub, args)
-	}else if function == "updateMerchant" {									//update a Merchant
+	}else if function == "updateMerchant" {					//update a Merchant
 		return t.updateMerchant(stub, args)
-	}else if function == "deleteMerchant" {									// delete a Merchant
+	}else if function == "deleteMerchant" {					//delete a Merchant
 		return t.deleteMerchant(stub, args)
-	}else if function == "createOwner" {									// create a owner
+	}else if function == "createOwner" {					//create a owner
 		return t.createOwner(stub, args)
-	}else if function == "updateMerchantsPPDS" {									//update a Merchant's PPDS
+	}else if function == "updateMerchantsPPDS" {			//update a Merchant's PPDS
 		return t.updateMerchantsPPDS(stub, args)
-	}else if function == "associateCustomer" {									// associate a customer to Merchant
+	}else if function == "associateCustomer" {				//associate a customer to Merchant
 		return t.associateCustomer(stub, args)
-	}else if function == "updateMerchantsExchangeRate" {									// update a Merchant's Exchange Rate
+	}else if function == "updateMerchantsExchangeRate" {	//update a Merchant's Exchange Rate
 		return t.updateMerchantsExchangeRate(stub, args)
 	}
 	fmt.Println("invoke did not find func: " + function)
@@ -187,38 +197,38 @@ func (t *ManageLPM) Query(stub shim.ChaincodeStubInterface, function string, arg
 	fmt.Println("query is running " + function)
 
 	// Handle different functions
-	if function == "getCustomerByID" {													//Read a Customer by Id
+	if function == "getCustomerByID" {						//Read a Customer by Id
 		return t.getCustomerByID(stub, args)
-	}else if function == "getCustomerDetailsByID" {													//Read all transactions 
+	}else if function == "getCustomerDetailsByID" {			//Read Customer Details by Id 
 		return t.getCustomerDetailsByID(stub, args)
-	}else if function == "getActivityHistory" {													//Read all transactions 
+	}else if function == "getActivityHistory" {				//Read all transactions 
 		return t.getActivityHistory(stub, args)
-	}else if function == "getActivityHistoryForMerchant" {													//Read all transactions 
+	}else if function == "getActivityHistoryForMerchant" {	//Read all transactions 
 		return t.getActivityHistoryForMerchant(stub, args)
-	}else if function == "getAllCustomers" {													//Read all Customers
+	}else if function == "getAllCustomers" {				//Read all Customers
 		return t.getAllCustomers(stub, args)
-	}else if function == "getCustomersByMerchantID" {													//Read a Customer by transId
+	}else if function == "getCustomersByMerchantID" {		//Read a Customer by transId
 		return t.getCustomersByMerchantID(stub, args)
-	}else if function == "getMerchantByName" {													//Read all Merchants by Name
+	}else if function == "getMerchantByName" {				//Read Merchant by Name
 		return t.getMerchantByName(stub, args)
-	}else if function == "getMerchantByID" {													//Read all Merchants
+	}else if function == "getMerchantByID" {				//Read Merchant by Id
 		return t.getMerchantByID(stub, args)
-	}else if function == "getMerchantDetailsByID" {													//Read all Merchants
+	}else if function == "getMerchantDetailsByID" {			//Read Merchant details by Id
 		return t.getMerchantDetailsByID(stub, args)
-	}else if function == "getMerchantsByIndustry" {													//Read all Merchants
+	}else if function == "getMerchantsByIndustry" {			//Read all Merchants by Industry
 		return t.getMerchantsByIndustry(stub, args)
-	}else if function == "getAllMerchants" {													//Read all Merchants
+	}else if function == "getAllMerchants" {				//Read all Merchants
 		return t.getAllMerchants(stub, args)
-	}else if function == "getMerchantsAccountBalance" {													//Read all Merchants
+	}else if function == "getMerchantsAccountBalance" {		//Read Merchant Account Balance
 		return t.getMerchantsAccountBalance(stub, args)
-	}else if function == "getMerchantsUserCount" {													//Read all Merchants
+	}else if function == "getMerchantsUserCount" {			//Read Merchant's User Count
 		return t.getMerchantsUserCount(stub, args)
-	}else if function == "getOwnersMerchantUserCount" {													//Read all Merchants
+	}else if function == "getOwnersMerchantUserCount" {		//Read Owner's Merchant and User Count
 		return t.getOwnersMerchantUserCount(stub, args)
-	}else if function == "getOwnerByID" {													//Read all Merchants
+	}else if function == "getOwnerByID" {					//Read Owner by Id
 		return t.getOwnerByID(stub, args)
 	}
-	fmt.Println("query did not find func: " + function)						//error
+	fmt.Println("query did not find func: " + function)		//error
 	errMsg := "{ \"message\" : \"Received unknown function query\", \"code\" : \"503\"}"
 	err := stub.SetEvent("errEvent", []byte(errMsg))
 	if err != nil {
@@ -243,7 +253,7 @@ func (t *ManageLPM) getCustomerByID(stub shim.ChaincodeStubInterface, args []str
 	}
 	// set customerId
 	customerId = args[0]
-	fmt.Print("customerId in getCustomerByID : "+customerId)
+	fmt.Print("customerId in getCustomerByID: "+customerId)
 	valAsbytes, err := stub.GetState(customerId)									//get the customerId from chaincode state
 	if err != nil {
 		errMsg := "{ \"message\" : \""+ customerId + " not Found.\", \"code\" : \"503\"}"
@@ -299,6 +309,7 @@ func (t *ManageLPM) getActivityHistory(stub shim.ChaincodeStubInterface, args []
 	var valIndex Transaction
 	var customerId string
 	var err error
+	var transactionTypeCustomerOnBoarding string
 	fmt.Println("start getActivityHistory")
 	
 	if len(args) != 1 {
@@ -309,9 +320,16 @@ func (t *ManageLPM) getActivityHistory(stub shim.ChaincodeStubInterface, args []
 		} 
 		return nil, nil
 	}
+
 	// set customerId
 	customerId = args[0]
 	fmt.Println("customerId in getActivityHistory::" + customerId)
+	customerAsBytes, err := stub.GetState(customerId)
+	if err != nil {
+		return nil, errors.New("Failed to get Customer customerID")
+	}
+	res_Customer := Customer{}
+	json.Unmarshal(customerAsBytes, &res_Customer)
 		
 	transactionAsBytes, err := stub.GetState(TransactionIndexStr)
 	if err != nil {
@@ -319,6 +337,7 @@ func (t *ManageLPM) getActivityHistory(stub shim.ChaincodeStubInterface, args []
 	}
 	json.Unmarshal(transactionAsBytes, &transactionIndex)								//un stringify it aka JSON.parse()
 	jsonResp = "{"
+	transactionTypeCustomerOnBoarding = "CustomerOnBoarding"
 	for i,val := range transactionIndex{
 		fmt.Println(strconv.Itoa(i) + " - looking at " + val + " for getActivityHistory")
 		valueAsBytes, err := stub.GetState(val)
@@ -331,8 +350,26 @@ func (t *ManageLPM) getActivityHistory(stub shim.ChaincodeStubInterface, args []
 		json.Unmarshal(valueAsBytes, &valIndex)
 		fmt.Print("valIndex: ")
 		fmt.Print(valIndex)
-        if valIndex.CustomerID == customerId{
-			fmt.Println("Customer found")
+		if valIndex.TransactionType == transactionTypeCustomerOnBoarding{
+			if valIndex.CustomerID == customerId{
+				fmt.Println("Customer found for CustomerOnBoarding")
+				jsonResp = jsonResp + "\""+ val + "\":" + string(valueAsBytes[:])
+				fmt.Println("jsonResp inside if for CustomerOnBoarding")
+				fmt.Println(jsonResp)
+				fmt.Println("transactionIndex for CustomerOnBoarding::")
+				fmt.Println(transactionIndex)
+				fmt.Println("length for CustomerOnBoarding::")
+				fmt.Println(len(transactionIndex))
+				if i < len(transactionIndex)-1 {
+					fmt.Println("i for CustomerOnBoarding::")
+					fmt.Println(i)
+					jsonResp = jsonResp + ","
+					fmt.Println("jsonResp inside if if for CustomerOnBoarding")
+					fmt.Println(jsonResp)
+				}
+			}	
+		} else if valIndex.TransactionFrom == res_Customer.UserName{
+			fmt.Println("Customer found other than CustomerOnBoarding")
 			jsonResp = jsonResp + "\""+ val + "\":" + string(valueAsBytes[:])
 			fmt.Println("jsonResp inside if")
 			fmt.Println(jsonResp)
@@ -347,7 +384,7 @@ func (t *ManageLPM) getActivityHistory(stub shim.ChaincodeStubInterface, args []
 				fmt.Println("jsonResp inside if if")
 				fmt.Println(jsonResp)
 			}
-		} 
+        } 
 	}
 	jsonResp = jsonResp + "}"
 	if strings.Contains(jsonResp, "},}"){
@@ -408,17 +445,17 @@ func (t *ManageLPM) getActivityHistoryForMerchant(stub shim.ChaincodeStubInterfa
 			if valIndex.TransactionFrom == merchantName{
 				fmt.Println("Customer's merchant found for CustomerOnBoarding")
 				jsonResp = jsonResp + "\""+ val + "\":" + string(valueAsBytes[:])
-				fmt.Println("jsonResp inside if")
+				fmt.Println("jsonResp inside if for CustomerOnBoarding")
 				fmt.Println(jsonResp)
-				fmt.Println("transactionIndex::")
+				fmt.Println("transactionIndex for CustomerOnBoarding::")
 				fmt.Println(transactionIndex)
-				fmt.Println("length::")
+				fmt.Println("length for CustomerOnBoarding::")
 				fmt.Println(len(transactionIndex))
 				if i < len(transactionIndex)-1 {
-					fmt.Println("i::")
+					fmt.Println("i for CustomerOnBoarding::")
 					fmt.Println(i)
 					jsonResp = jsonResp + ","
-					fmt.Println("jsonResp inside if if")
+					fmt.Println("jsonResp inside if if for CustomerOnBoarding")
 					fmt.Println(jsonResp)
 				}
 			}
@@ -445,7 +482,7 @@ func (t *ManageLPM) getActivityHistoryForMerchant(stub shim.ChaincodeStubInterfa
 		fmt.Println("in if for jsonResp contains wrong json")	
 		jsonResp = strings.Replace(jsonResp, "},}", "}}", -1)
 	}
-	fmt.Println("jsonResp : " + jsonResp)
+	fmt.Println("final jsonResp in getActivityHistoryForMerchant: " + jsonResp)
 	fmt.Print("jsonResp in bytes : ")
 	fmt.Println([]byte(jsonResp))
 	fmt.Println("end getActivityHistoryForMerchant")
@@ -803,6 +840,7 @@ func (t *ManageLPM) getMerchantsAccountBalance(stub shim.ChaincodeStubInterface,
 	fmt.Print("purchaseBalance for merchant : ")
 	fmt.Print(merchantIndex.PurchaseBalance)
 	accountBalanceMerchant, _ := strconv.ParseFloat(merchantIndex.PurchaseBalance, 64)
+	merchantInitialBalance, _ := strconv.ParseFloat(merchantIndex.MerchantInitialBalance, 64)
 	// Get Merchants Balance from Merchant Struct END
 
 	customerAsBytes, err := stub.GetState(CustomerIndexStr)
@@ -826,7 +864,7 @@ func (t *ManageLPM) getMerchantsAccountBalance(stub shim.ChaincodeStubInterface,
 		fmt.Print("valIndex: ")
 		fmt.Print(valIndex)
 		if strings.Contains(valIndex.MerchantIDs, merchantId){
-			fmt.Println("Merchant found")
+			fmt.Println("Merchant found for Customer::"+valIndex.CustomerID)
 
 			// find the index of the merchant to take the merchantPointsWorth in that index only
 			fmt.Println("valIndex.MerchantIDs::"+valIndex.MerchantIDs)
@@ -844,12 +882,36 @@ func (t *ManageLPM) getMerchantsAccountBalance(stub shim.ChaincodeStubInterface,
 				if merchantIndexForPointsWorth == k{
 					fmt.Println(strconv.Itoa(k) + " - looking at " + val + " for balance")
 					valToBeAdded, _ := strconv.ParseFloat(val, 64)
-	     		    accountBalance = accountBalance + valToBeAdded
-	     		}
-    		}
-    		accountBalance = accountBalance + accountBalanceMerchant
+					fmt.Println("accountBalance1::")
+					fmt.Println(accountBalance)			
+					fmt.Println("valToBeAdded::")
+					fmt.Println(valToBeAdded)
+	     		    		accountBalance = accountBalance + valToBeAdded
+					fmt.Println("accountBalance2::")
+					fmt.Println(accountBalance)			
+	     			}
+    			}
+			/*fmt.Println("accountBalance3::")
+			fmt.Println(accountBalance)
+			fmt.Println("accountBalanceMerchant::")
+			fmt.Println(accountBalanceMerchant)
+    			accountBalance = accountBalance + accountBalanceMerchant
+			fmt.Println("accountBalance4::")
+			fmt.Println(accountBalance)*/
 		} 
 	}
+	fmt.Println("accountBalance3::")
+	fmt.Println(accountBalance)
+	accountBalance = accountBalance + merchantInitialBalance + accountBalanceMerchant
+	fmt.Println("accountBalance4::")
+	fmt.Println(accountBalance)
+	merchantInitialBalanceVar, _ := strconv.ParseFloat(MerchantInitialBalance, 64)
+	amountFromCustomerOnBoarding :=  merchantInitialBalanceVar - merchantInitialBalance
+	fmt.Println("amountFromCustomerOnBoarding::")
+	fmt.Println(amountFromCustomerOnBoarding)
+	accountBalance = accountBalance - amountFromCustomerOnBoarding
+	fmt.Println("accountBalance5::")
+	fmt.Println(accountBalance)
 	jsonResp = jsonResp + "\"merchantAccountBalance\":" + strconv.FormatFloat(accountBalance, 'f', 2, 64)
 	jsonResp = jsonResp + "}"
 	if strings.Contains(jsonResp, "},}"){
@@ -1025,6 +1087,48 @@ func (t *ManageLPM) createCustomer(stub shim.ChaincodeStubInterface, args []stri
  	transactionDateTime := args[11]
 	transactionType := args[12]
 
+	merchantAsBytes, err := stub.GetState(merchantID)
+	if err != nil {
+		return nil, errors.New("Failed to get Merchant merchantID")
+	}
+	res_Merchant := Merchant{}
+	json.Unmarshal(merchantAsBytes, &res_Merchant)
+	if res_Merchant.MerchantID == merchantID{
+		fmt.Println("Merchant found with merchantID in createCustomer: " + merchantID)
+		fmt.Println(res_Merchant);
+	}else{
+		errMsg := "{ \"message\" : \""+ merchantID+ " Not Found.\", \"code\" : \"503\"}"
+		err = stub.SetEvent("errEvent", []byte(errMsg))
+		if err != nil {
+			return nil, err
+		} 
+		return nil, nil
+	}
+	floatStartingBalance, _ := strconv.ParseFloat(StartingBalance, 64)
+	floatInitialBalance, _ := strconv.ParseFloat(res_Merchant.MerchantInitialBalance, 64) 
+	_merchantInitialBalance := floatInitialBalance - floatStartingBalance
+	//build the Merchant json string manually
+	merchant_json := 	`{`+
+		`"merchantId": "` + res_Merchant.MerchantID + `" , `+
+		`"merchantUserName": "` + res_Merchant.MerchantUserName + `" , `+
+		`"merchantName": "` + res_Merchant.MerchantName + `" , `+
+		`"merchantIndustry": "` + res_Merchant.MerchantIndustry + `" , `+
+		`"industryColor": "` + res_Merchant.IndustryColor + `" , `+
+		`"pointsPerDollarSpent": "` + res_Merchant.PointsPerDollarSpent + `" , `+ 
+		`"exchangeRate": "` + res_Merchant.ExchangeRate + `" , `+ 
+		`"purchaseBalance": "` + res_Merchant.PurchaseBalance + `" , `+
+		`"merchantCurrency": "` + res_Merchant.MerchantCurrency + `" , `+ 
+		`"merchantCU_date": "` + res_Merchant.MerchantCU_date + `" , `+ 
+		`"merchantInitialBalance": "` + strconv.FormatFloat(_merchantInitialBalance, 'f', 2, 64) + `" `+ 
+	`}`
+	fmt.Println("merchant_json:::::::::::::::::::::::::::::::::::::::::::::::::::: " + merchant_json)
+	fmt.Print("merchant_json in bytes array: ")
+	fmt.Println([]byte(merchant_json))
+	err = stub.PutState(merchantID, []byte(merchant_json))									//store Merchant with merchantId as key
+	if err != nil {
+		return nil, err
+	}
+
 	customerAsBytes, err := stub.GetState(customerId)
 	if err != nil {
 		return nil, errors.New("Failed to get Customer customerID")
@@ -1086,8 +1190,8 @@ func (t *ManageLPM) createCustomer(stub shim.ChaincodeStubInterface, args []stri
 		`"transactionType": "` + transactionType + `" , `+
 		`"transactionFrom": "` + merchantName + `" , `+ 
 		`"transactionTo": "` + userName + `" , `+ 
-		`"credit": "` + walletWorth + `" , `+ 
-		`"debit": "` + "0" + `" , `+ 
+		`"credit": "` + merchantsPointsWorth + `" , `+ 
+		`"debit": "` + "0.00" + `" , `+ 
 		`"customerId": "` +  customerId + `" `+ 
 	`}`
 	err = stub.PutState(transactionID, []byte(transaction_json))					//store Transaction with id as key
@@ -1317,6 +1421,7 @@ func (t *ManageLPM) updateCustomerPurchase(stub shim.ChaincodeStubInterface, arg
 		`"merchantsPointsCount": "` + res.MerchantsPointsCount + `" , `+ 
 		`"merchantsPointsWorth": "` +  res.MerchantsPointsWorth + `" `+ 
 	`}`
+	fmt.Println("customer_json:::::::::::::::::::::::::::::::::::::::::::::::::::: " + customer_json)
 	err = stub.PutState(customerId, []byte(customer_json))							//store Customer with id as key
 	if err != nil {
 		return nil, err
@@ -1333,6 +1438,7 @@ func (t *ManageLPM) updateCustomerPurchase(stub shim.ChaincodeStubInterface, arg
  		`"debit": "` + res_trans1.Debit + `" , `+ 
  		`"customerId": "` +  res_trans1.CustomerID + `" `+ 
     `}`
+	fmt.Println("transaction_json1:::::::::::::::::::::::::::::::::::::::::::::::::::: " + transaction_json1)
 	err = stub.PutState(transactionId1, []byte(transaction_json1))					//store Transaction with id as key
 	if err != nil {
 		return nil, err
@@ -1368,6 +1474,7 @@ func (t *ManageLPM) updateCustomerPurchase(stub shim.ChaincodeStubInterface, arg
  		`"debit": "` + res_trans2.Debit + `" , `+ 
  		`"customerId": "` +  res_trans2.CustomerID + `" `+ 
  	`}`
+	fmt.Println("transaction_json2:::::::::::::::::::::::::::::::::::::::::::::::::::: " + transaction_json2)
  	err = stub.PutState(transactionId2, []byte(transaction_json2))					//store Transaction with id as key
  	if err != nil {
  		return nil, err
@@ -1391,8 +1498,10 @@ func (t *ManageLPM) updateCustomerPurchase(stub shim.ChaincodeStubInterface, arg
   	}
 
 	// update the Merchant START
+	fmt.Println("res_Merchant.MerchantID in updateCustomerPurchase::"+res_Merchant.MerchantID)
+	fmt.Println("res_Merchant.PurchaseBalance in updateCustomerPurchase::"+res_Merchant.PurchaseBalance)
 	merchant_args := []string{res_Merchant.MerchantID, res_Merchant.PurchaseBalance, res_Merchant.MerchantCU_date}
-	t.updateMerchantsPurchaseBal(stub, merchant_args)
+	t.updateMerchantsPurchaseBal(stub, merchant_args)	// Call to Internal Function
  	// update the Merchant END
 
 	tosend := "{ \"customerID\" : \""+customerId+"\", \"message\" : \"Customer details updated succcessfully\", \"code\" : \"200\"}"
@@ -1508,6 +1617,7 @@ func (t *ManageLPM) updateCustomerTransfer(stub shim.ChaincodeStubInterface, arg
 		`"merchantsPointsCount": "` + res1.MerchantsPointsCount + `" , `+ 
 		`"merchantsPointsWorth": "` +  res1.MerchantsPointsWorth + `" `+ 
 	`}`
+	fmt.Println("customer1_json:::::::::::::::::::::::::::::::::::::::::::::::::::: " + customer1_json)
 	err = stub.PutState(customerId1, []byte(customer1_json))							//store Customer with id as key
 	if err != nil {
 		return nil, err
@@ -1526,6 +1636,7 @@ func (t *ManageLPM) updateCustomerTransfer(stub shim.ChaincodeStubInterface, arg
 		`"merchantsPointsCount": "` + res2.MerchantsPointsCount + `" , `+ 
 		`"merchantsPointsWorth": "` +  res2.MerchantsPointsWorth + `" `+ 
 	`}`
+	fmt.Println("customer2_json:::::::::::::::::::::::::::::::::::::::::::::::::::: " + customer2_json)
 	err = stub.PutState(customerId2, []byte(customer2_json))							//store Customer with id as key
 	if err != nil {
 		return nil, err
@@ -1542,6 +1653,7 @@ func (t *ManageLPM) updateCustomerTransfer(stub shim.ChaincodeStubInterface, arg
  		`"debit": "` + res_trans1.Debit + `" , `+ 
  		`"customerId": "` +  res_trans1.CustomerID + `" `+ 
     `}`
+	fmt.Println("transaction_json1:::::::::::::::::::::::::::::::::::::::::::::::::::: " + transaction_json1)
 	err = stub.PutState(transactionId1, []byte(transaction_json1))					//store Transaction with id as key
 	if err != nil {
 		return nil, err
@@ -1577,6 +1689,7 @@ func (t *ManageLPM) updateCustomerTransfer(stub shim.ChaincodeStubInterface, arg
  		`"debit": "` + res_trans2.Debit + `" , `+ 
  		`"customerId": "` +  res_trans2.CustomerID + `" `+ 
  	`}`
+	fmt.Println("transaction_json2:::::::::::::::::::::::::::::::::::::::::::::::::::: " + transaction_json2)
  	err = stub.PutState(transactionId2, []byte(transaction_json2))					//store Transaction with id as key
  	if err != nil {
  		return nil, err
@@ -1606,6 +1719,27 @@ func (t *ManageLPM) updateCustomerTransfer(stub shim.ChaincodeStubInterface, arg
 	} 
 
 	fmt.Println("Customer details updated succcessfully for transfer")
+	return nil, nil
+}
+// ============================================================================================================================
+// Write - update customer during accumulation into chaincode state - SmartContracts
+// ============================================================================================================================
+func (t *ManageLPM) updateCustomerAccumulationSC(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	fmt.Println("Customer details updated succcessfully")
+	return nil, nil
+}
+// ============================================================================================================================
+// Write - update customer during redemption into chaincode state - SmartContracts
+// ============================================================================================================================
+func (t *ManageLPM) updateCustomerPurchaseSC(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	fmt.Println("Customer details updated succcessfully")
+	return nil, nil
+}
+// ============================================================================================================================
+// Write - update customer during transfer into chaincode state - SmartContracts
+// ============================================================================================================================
+func (t *ManageLPM) updateCustomerTransferSC(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	fmt.Println("Customer details updated succcessfully")
 	return nil, nil
 }
 // ============================================================================================================================
@@ -1712,6 +1846,7 @@ func (t *ManageLPM) createMerchant(stub shim.ChaincodeStubInterface, args []stri
 		} 
 		return nil, nil				//all stop a Merchant by this name exists
 	}
+	fmt.Println("MerchantInitialBalance::"+MerchantInitialBalance)
 	//build the Merchant json string manually
 	merchant_json := 	`{`+
 		`"merchantId": "` + merchantID + `" , `+
@@ -1723,7 +1858,8 @@ func (t *ManageLPM) createMerchant(stub shim.ChaincodeStubInterface, args []stri
 		`"exchangeRate": "` + exchangeRate + `" , `+ 
 		`"purchaseBalance": "` + purchaseBalance + `" , `+
 		`"merchantCurrency": "` + merchantCurrency + `" , `+
-		`"merchantCU_date": "` + merchantCU_date + `" `+ 
+		`"merchantCU_date": "` + merchantCU_date + `" , `+
+		`"merchantInitialBalance": "` + MerchantInitialBalance + `" `+ 
 	`}`
 	fmt.Println("merchant_json: " + merchant_json)
 	fmt.Print("merchant_json in bytes array: ")
@@ -1766,8 +1902,8 @@ func (t *ManageLPM) createMerchant(stub shim.ChaincodeStubInterface, args []stri
 func (t *ManageLPM) updateMerchant(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 	var err error
 	fmt.Println("Updating Merchant")
-	if len(args) != 9 {
-		errMsg := "{ \"message\" : \"Incorrect number of arguments. Expecting 9\", \"code\" : \"503\"}"
+	if len(args) != 10 {
+		errMsg := "{ \"message\" : \"Incorrect number of arguments. Expecting 10\", \"code\" : \"503\"}"
 		err = stub.SetEvent("errEvent", []byte(errMsg))
 		if err != nil {
 			return nil, err
@@ -1799,6 +1935,7 @@ func (t *ManageLPM) updateMerchant(stub shim.ChaincodeStubInterface, args []stri
 		res.PurchaseBalance = args[7]
 		res.MerchantCurrency = args[8]
 		res.MerchantCU_date = args[9]
+		res.MerchantInitialBalance = args[10]
 	}else{
 		errMsg := "{ \"message\" : \""+ merchantId+ " Not Found.\", \"code\" : \"503\"}"
 		err = stub.SetEvent("errEvent", []byte(errMsg))
@@ -1810,7 +1947,7 @@ func (t *ManageLPM) updateMerchant(stub shim.ChaincodeStubInterface, args []stri
 	
 	//build the Merchant json string manually
 	merchant := 	`{`+
-		`"merchantID": "` + res.MerchantID + `" , `+
+		`"merchantId": "` + res.MerchantID + `" , `+
 		`"merchantUserName": "` + res.MerchantUserName + `" , `+
 		`"merchantName": "` + res.MerchantName + `" , `+
 		`"merchantIndustry": "` + res.MerchantIndustry + `" , `+ 
@@ -1819,8 +1956,9 @@ func (t *ManageLPM) updateMerchant(stub shim.ChaincodeStubInterface, args []stri
 		`"exchangeRate": "` + res.ExchangeRate + `" , `+ 
 		`"purchaseBalance": "` + res.PurchaseBalance + `" , `+ 
 		`"merchantCurrency": "` + res.MerchantCurrency + `" , `+
-		`"merchantCU_date": "` +  res.MerchantCU_date + `" `+ 
-		`}`
+		`"merchantCU_date": "` + res.MerchantCU_date + `" , `+
+		`"merchantInitialBalance": "` +  res.MerchantInitialBalance + `" `+ 
+	`}`
 	err = stub.PutState(merchantId, []byte(merchant))						//store Merchant with id as key
 	if err != nil {
 		return nil, err
@@ -1836,7 +1974,7 @@ func (t *ManageLPM) updateMerchant(stub shim.ChaincodeStubInterface, args []stri
 	return nil, nil
 }
 // ============================================================================================================================
-// Write - update merchant's purchase balance into chaincode state
+// Write - update merchant's purchase balance into chaincode state -- Internal Function
 // ============================================================================================================================
 func (t *ManageLPM) updateMerchantsPurchaseBal(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 	var err error
@@ -1851,7 +1989,9 @@ func (t *ManageLPM) updateMerchantsPurchaseBal(stub shim.ChaincodeStubInterface,
 	}
 	// set merchantId
 	merchantId := args[0]
+	fmt.Println("merchantId in updateMerchantsPurchaseBal: " + merchantId)
 	newPurchaseBal := args[1]
+	fmt.Println("newPurchaseBal in updateMerchantsPurchaseBal : " + newPurchaseBal)
 	merchantAsBytes, err := stub.GetState(merchantId)									//get the Merchant for the specified merchant from chaincode state
 	if err != nil {
 		errMsg := "{ \"message\" : \"Failed to get state for " + merchantId + "\", \"code\" : \"503\"}"
@@ -1867,7 +2007,12 @@ func (t *ManageLPM) updateMerchantsPurchaseBal(stub shim.ChaincodeStubInterface,
 		fmt.Println("Merchant found with merchantId : " + merchantId)
 		fmt.Println("Merchants old purchaseBalance : " + res.PurchaseBalance)
 		fmt.Println("Merchants new purchaseBalance : " + newPurchaseBal)
-		res.PurchaseBalance += newPurchaseBal 
+
+		currentPurchaseBalanceFloat, _ := strconv.ParseFloat(res.PurchaseBalance, 64)
+		newPurchaseBalFloat, _ := strconv.ParseFloat(newPurchaseBal, 64) 
+		purchaseBalanceCalculated := currentPurchaseBalanceFloat + newPurchaseBalFloat
+
+		res.PurchaseBalance = strconv.FormatFloat(purchaseBalanceCalculated, 'f', 2, 64)
 		res.MerchantCU_date = args[2]
 	}else{
 		errMsg := "{ \"message\" : \""+ merchantId+ " Not Found.\", \"code\" : \"503\"}"
@@ -1880,7 +2025,7 @@ func (t *ManageLPM) updateMerchantsPurchaseBal(stub shim.ChaincodeStubInterface,
 	
 	//build the Merchant json string manually
 	merchant_json := 	`{`+
-		`"merchantID": "` + res.MerchantID + `" , `+
+		`"merchantId": "` + res.MerchantID + `" , `+
 		`"merchantUserName": "` + res.MerchantUserName + `" , `+
 		`"merchantName": "` + res.MerchantName + `" , `+
 		`"merchantIndustry": "` + res.MerchantIndustry + `" , `+ 
@@ -1889,8 +2034,9 @@ func (t *ManageLPM) updateMerchantsPurchaseBal(stub shim.ChaincodeStubInterface,
 		`"exchangeRate": "` + res.ExchangeRate + `" , `+ 
 		`"purchaseBalance": "` + res.PurchaseBalance + `" , `+ 
 		`"merchantCurrency": "` + res.MerchantCurrency + `" , `+
-		`"merchantCU_date": "` +  res.MerchantCU_date + `" `+ 
-		`}`
+		`"merchantCU_date": "` + res.MerchantCU_date + `" , `+
+		`"merchantInitialBalance": "` +  res.MerchantInitialBalance + `" `+ 
+	`}`
 
 	fmt.Println("merchant_json in updateMerchantsPurchaseBal::" + merchant_json)
 		
@@ -1953,7 +2099,7 @@ func (t *ManageLPM) updateMerchantsPPDS(stub shim.ChaincodeStubInterface, args [
 	
 	//build the Merchant json string manually
 	merchant_json := 	`{`+
-		`"merchantID": "` + res.MerchantID + `" , `+
+		`"merchantId": "` + res.MerchantID + `" , `+
 		`"merchantUserName": "` + res.MerchantUserName + `" , `+
 		`"merchantName": "` + res.MerchantName + `" , `+
 		`"merchantIndustry": "` + res.MerchantIndustry + `" , `+ 
@@ -1962,8 +2108,9 @@ func (t *ManageLPM) updateMerchantsPPDS(stub shim.ChaincodeStubInterface, args [
 		`"exchangeRate": "` + res.ExchangeRate + `" , `+ 
 		`"purchaseBalance": "` + res.PurchaseBalance + `" , `+ 
 		`"merchantCurrency": "` + res.MerchantCurrency + `" , `+
-		`"merchantCU_date": "` +  res.MerchantCU_date + `" `+ 
-		`}`
+		`"merchantCU_date": "` + res.MerchantCU_date + `" , `+
+		`"merchantInitialBalance": "` +  res.MerchantInitialBalance + `" `+ 
+	`}`
 
 	fmt.Println("merchant_json in updateMerchantsPPDS::" + merchant_json)
 		
@@ -2026,7 +2173,7 @@ func (t *ManageLPM) updateMerchantsExchangeRate(stub shim.ChaincodeStubInterface
 	
 	//build the Merchant json string manually
 	merchant_json := 	`{`+
-		`"merchantID": "` + res.MerchantID + `" , `+
+		`"merchantId": "` + res.MerchantID + `" , `+
 		`"merchantUserName": "` + res.MerchantUserName + `" , `+
 		`"merchantName": "` + res.MerchantName + `" , `+
 		`"merchantIndustry": "` + res.MerchantIndustry + `" , `+ 
@@ -2035,8 +2182,9 @@ func (t *ManageLPM) updateMerchantsExchangeRate(stub shim.ChaincodeStubInterface
 		`"exchangeRate": "` + res.ExchangeRate + `" , `+ 
 		`"purchaseBalance": "` + res.PurchaseBalance + `" , `+ 
 		`"merchantCurrency": "` + res.MerchantCurrency + `" , `+
-		`"merchantCU_date": "` +  res.MerchantCU_date + `" `+ 
-		`}`
+		`"merchantCU_date": "` + res.MerchantCU_date + `" , `+
+		`"merchantInitialBalance": "` +  res.MerchantInitialBalance + `" `+ 
+	`}`
 
 	fmt.Println("merchant_json in updateMerchantsExchangeRate::" + merchant_json)
 		
@@ -2194,8 +2342,8 @@ func (t *ManageLPM) createOwner(stub shim.ChaincodeStubInterface, args []string)
 func (t *ManageLPM) associateCustomer(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 	var err error
 	var walletWorth, merchantIDs, merchantNames, merchantColors, merchantCurrencies, merchantsPointsCount, merchantsPointsWorth string
-	if len(args) != 6 {
-		errMsg := "{ \"message\" : \"Incorrect number of arguments. Expecting 6\", \"code\" : \"503\"}"
+	if len(args) != 5 {
+		errMsg := "{ \"message\" : \"Incorrect number of arguments. Expecting 5\", \"code\" : \"503\"}"
 		err = stub.SetEvent("errEvent", []byte(errMsg))
 		if err != nil {
 			return nil, err
@@ -2205,8 +2353,7 @@ func (t *ManageLPM) associateCustomer(stub shim.ChaincodeStubInterface, args []s
 	fmt.Println("start associateCustomer")
 	customerId := args[0]
 	merchantId := args[1]
-	startingBalance := args[2]
-	
+		
 	customerAsBytes, err := stub.GetState(customerId)
 	if err != nil {
 		return nil, errors.New("Failed to get Customer customerID")
@@ -2236,11 +2383,12 @@ func (t *ManageLPM) associateCustomer(stub shim.ChaincodeStubInterface, args []s
 	}
 
 	// Calculation	
-	floatStartingBalance, _ := strconv.ParseFloat(startingBalance, 64)
-	//fmt.Println("-------------------------floatStartingBalance----------------------------"+strconv.FormatFloat(floatStartingBalance, 'f', 2, 64))
-	floatPointsPerDollarSpent, _ := strconv.ParseFloat(res_Merchant.PointsPerDollarSpent, 64)
-	pointsToBeCredited := floatStartingBalance / floatPointsPerDollarSpent
-	//fmt.Println("pointsToBeCredited in associateCustomer: " + strconv.FormatFloat(pointsToBeCredited, 'f', 2, 64))
+	floatStartingBalance, _ := strconv.ParseFloat(StartingBalance, 64)
+	floatExchangeRate, _ := strconv.ParseFloat(res_Merchant.ExchangeRate, 64)
+	pointsToBeCredited := floatStartingBalance / floatExchangeRate
+	floatInitialBalance, _ := strconv.ParseFloat(res_Merchant.MerchantInitialBalance, 64) 
+	_merchantInitialBalance := floatInitialBalance - floatStartingBalance
+	fmt.Println("_merchantInitialBalance in associateCustomer::"+strconv.FormatFloat(_merchantInitialBalance, 'f', 2, 64))
 	json.Unmarshal(customerAsBytes, &res)
 	floatWalletWorth, _ := strconv.ParseFloat(res.WalletWorth, 64)
 	newWalletWorth := floatWalletWorth + floatStartingBalance
@@ -2254,15 +2402,16 @@ func (t *ManageLPM) associateCustomer(stub shim.ChaincodeStubInterface, args []s
 		merchantColors = res.MerchantColors + "," + res_Merchant.IndustryColor
 		merchantCurrencies = res.MerchantCurrencies + "," + res_Merchant.MerchantCurrency
 		merchantsPointsCount = res.MerchantsPointsCount + "," + strconv.FormatFloat(pointsToBeCredited, 'f', 2, 64)
-		merchantsPointsWorth = res.MerchantsPointsWorth + "," + startingBalance
+		merchantsPointsWorth = res.MerchantsPointsWorth + "," + StartingBalance
 	
-		res_trans.TransactionID = args[3]
- 		res_trans.TransactionDateTime = args[4]
- 		res_trans.TransactionType = args[5]
+		res_trans.TransactionID = args[2]
+ 		res_trans.TransactionDateTime = args[3]
+ 		res_trans.TransactionType = args[4]
  		res_trans.TransactionFrom = res_Merchant.MerchantName
  		res_trans.TransactionTo = res.UserName
- 		res_trans.Credit = strconv.FormatFloat(pointsToBeCredited, 'f', 2, 64)
- 		res_trans.Debit = "0"
+ 		//res_trans.Credit = strconv.FormatFloat(pointsToBeCredited, 'f', 2, 64)
+ 		res_trans.Credit = strconv.FormatFloat(floatStartingBalance, 'f', 2, 64)
+ 		res_trans.Debit = "0.00"
  		res_trans.CustomerID = customerId
 	}else{
 		errMsg := "{ \"message\" : \""+ customerId+ " Not Found.\", \"code\" : \"503\"}"
@@ -2286,7 +2435,7 @@ func (t *ManageLPM) associateCustomer(stub shim.ChaincodeStubInterface, args []s
 		`"merchantsPointsCount": "` + merchantsPointsCount + `" , `+ 
 		`"merchantsPointsWorth": "` +  merchantsPointsWorth + `" `+ 
 	`}`
-	fmt.Println("customer_json: " + customer_json)
+	fmt.Println("customer_json:::::::::::::::::::::::::::::::::::::::::::::::::::: " + customer_json)
 	fmt.Print("customer_json in bytes array: ")
 	fmt.Println([]byte(customer_json))
 	err = stub.PutState(customerId, []byte(customer_json))									//store Customer with customerId as key
@@ -2294,7 +2443,29 @@ func (t *ManageLPM) associateCustomer(stub shim.ChaincodeStubInterface, args []s
 		return nil, err
 	}
 
-	// build the Transaction json string manually
+	//build the Merchant json string manually
+	merchant_json := 	`{`+
+		`"merchantId": "` + res_Merchant.MerchantID + `" , `+
+		`"merchantUserName": "` + res_Merchant.MerchantUserName + `" , `+
+		`"merchantName": "` + res_Merchant.MerchantName + `" , `+
+		`"merchantIndustry": "` + res_Merchant.MerchantIndustry + `" , `+
+		`"industryColor": "` + res_Merchant.IndustryColor + `" , `+
+		`"pointsPerDollarSpent": "` + res_Merchant.PointsPerDollarSpent + `" , `+ 
+		`"exchangeRate": "` + res_Merchant.ExchangeRate + `" , `+ 
+		`"purchaseBalance": "` + res_Merchant.PurchaseBalance + `" , `+
+		`"merchantCurrency": "` + res_Merchant.MerchantCurrency + `" , `+ 
+		`"merchantCU_date": "` + res_Merchant.MerchantCU_date + `" , `+ 
+		`"merchantInitialBalance": "` + strconv.FormatFloat(_merchantInitialBalance, 'f', 2, 64) + `" `+ 
+	`}`
+	fmt.Println("merchant_json:::::::::::::::::::::::::::::::::::::::::::::::::::: " + merchant_json)
+	fmt.Print("merchant_json in bytes array: ")
+	fmt.Println([]byte(merchant_json))
+	err = stub.PutState(merchantId, []byte(merchant_json))									//store Merchant with merchantId as key
+	if err != nil {
+		return nil, err
+	}
+
+	//build the Transaction json string manually
 	transaction_json := `{`+
 		`"transactionId": "` + res_trans.TransactionID + `" , `+
 		`"transactionDateTime": "` + res_trans.TransactionDateTime + `" , `+
@@ -2305,6 +2476,7 @@ func (t *ManageLPM) associateCustomer(stub shim.ChaincodeStubInterface, args []s
 		`"debit": "` + res_trans.Debit + `" , `+ 
 		`"customerId": "` +  res_trans.CustomerID + `" `+ 
 	`}`
+	fmt.Println("transaction_json:::::::::::::::::::::::::::::::::::::::::::::::::::: " + transaction_json)
 	err = stub.PutState(res_trans.TransactionID, []byte(transaction_json))					//store Transaction with id as key
 	if err != nil {
 		return nil, err
